@@ -1,0 +1,13 @@
+body {
+    text-align: center;
+}
+
+p.bg-primary {
+    padding:15px;
+    font-size:150%;
+}
+
+.bg-primary a:link {
+    color: white !important;
+    text-decoration: underline;
+}
