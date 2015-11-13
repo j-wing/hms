@@ -1,26 +1,54 @@
 package hms
 
 import (
-	//"fmt"
-	"io/ioutil"
+	"fmt"
+	"html/template"
+	"math/rand"
 	"net/http"
+	"strings"
+	"time"
+
+	"appengine"
+	"appengine/datastore"
 )
 
 var (
-	indexTmpl []byte
+	indexTmpl = template.Must(template.ParseFiles("index.html"))
 	routes    map[string]string
 )
 
-func init() {
-	content, err := ioutil.ReadFile("index.html")
-	if err != nil {
-		panic(err)
+const letterRunes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
+type URLMatch struct {
+	Path      string
+	TargetURL string
+	Creator   string
+	Created   time.Time
+}
+
+type IndexTemplateParams struct {
+	Path       string
+	TargetURL  string
+	Message    string
+	CreatedURL string
+}
+
+func URLMatchKey(c appengine.Context) *datastore.Key {
+	return datastore.NewKey(c, "URLMatch", "default_urlmatch", 0, nil)
+
+}
+
+func createRandomPath(n int) string {
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letterRunes[rand.Intn(len(letterRunes))]
 	}
-	indexTmpl = content
+	return string(b)
 
+}
+
+func init() {
 	http.HandleFunc("/", ShortenerHandler)
-	http.HandleFunc("/wat", WatRedirect)
 }
 
 func redirectHandler(loc string, w http.ResponseWriter) {
@@ -32,54 +60,86 @@ func FBRedirect(w http.ResponseWriter, r *http.Request) {
 	redirectHandler("https://www.facebook.com/messages/conversation-807942749260663", w)
 }
 
-func WatRedirect(w http.ResponseWriter, r *http.Request) {
-	redirectHandler("https://www.google.com/search?site=&tbm=isch&source=hp&biw=1920&bih=969&q=wat&oq=wat&gs_l=img.12...0.0.0.2619.0.0.0.0.0.0.0.0..0.0....0...1ac..64.img..0.0.0.Zioxed2_GrU", w)
+func isValidPath(path string) bool {
+	return true
+}
+
+func isValidTargetURL(target string) bool {
+	return !strings.Contains(target, "hms.space")
 }
 
 func createShortenedURL(r *http.Request) (string, string) {
 	path := r.FormValue("path")
 	target := r.FormValue("target")
 
-	if path == "" || target == "" {
-		return "", "empty path or target"
+	if target == "" {
+		return "", "empty target"
 	} else {
-		routes[path] = target
+		if path == "" {
+			path = createRandomPath(4)
+		} else if !isValidPath(path) {
+			return "", "invalid path"
+		} else if !isValidTargetURL(target) {
+			return "", "invalid target url"
+		}
+		c := appengine.NewContext(r)
+		u := URLMatch{
+			Path:      path,
+			TargetURL: target,
+			Creator:   "",
+			Created:   time.Now(),
+		}
+
+		key := datastore.NewIncompleteKey(c, "URLMatch", URLMatchKey(c))
+		_, err := datastore.Put(c, key, &u)
+		if err != nil {
+			return "", "ERROR"
+		}
 		return path, ""
 	}
 }
 
-func writeNotFound(w http.ResponseWriter) {
-	w.WriteHeader(http.StatusNotFound)
-	w.Write([]byte("No match!"))
+func writeNotFound(w http.ResponseWriter, path string) {
+	indexTmpl.Execute(w, IndexTemplateParams{
+		Path:    path[1:],
+		Message: "No entry for that path. Add one?",
+	})
 }
 
 func ShortenerHandler(w http.ResponseWriter, r *http.Request) {
 	reqPath := r.URL.Path
-	if routes == nil {
-		routes = make(map[string]string)
-		writeNotFound(w)
-	}
 
 	if reqPath == "/" {
 		if r.Method == "GET" {
-			w.Write(indexTmpl)
+			indexTmpl.Execute(w, IndexTemplateParams{
+				Path:      r.FormValue("path"),
+				TargetURL: r.FormValue("targetURL"),
+			})
 		} else if r.Method == "POST" {
 			resURL, err := createShortenedURL(r)
 			if err != "" {
-				w.Write([]byte(err))
+				http.Error(w, err, http.StatusInternalServerError)
 			} else {
-				w.Header().Set("Location", resURL)
-				w.WriteHeader(http.StatusFound)
+				fullURL := fmt.Sprintf("%v/%v", r.Host, resURL)
+				indexTmpl.Execute(w, IndexTemplateParams{
+					CreatedURL: fullURL,
+				})
 			}
 		}
 	} else {
+		c := appengine.NewContext(r)
+		match := make([]URLMatch, 0, 1)
+		_, err := datastore.NewQuery("URLMatch").Filter("Path =", reqPath[1:]).Limit(1).GetAll(c, &match)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 
-		match := routes[reqPath]
-		if match != "" {
-			w.Header().Set("Location", match)
+		}
+
+		if len(match) != 0 {
+			w.Header().Set("Location", match[0].TargetURL)
 			w.WriteHeader(http.StatusFound)
 		} else {
-			writeNotFound(w)
+			writeNotFound(w, reqPath)
 		}
 	}
 }
