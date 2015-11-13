@@ -7,7 +7,7 @@ p.bg-primary {
     font-size:150%;
 }
 
-.bg-primary a:link {
+.bg-primary a:link,.bg-primary a:visited{
     color: white !important;
     text-decoration: underline;
 }
