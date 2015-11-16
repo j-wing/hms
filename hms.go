@@ -31,6 +31,8 @@ type IndexTemplateParams struct {
 	TargetURL  string
 	Message    string
 	CreatedURL string
+	Host       string
+	PastLinks  []URLMatch
 }
 
 func URLMatchKey(c appengine.Context) *datastore.Key {
@@ -48,6 +50,8 @@ func createRandomPath(n int) string {
 }
 
 func init() {
+	rand.Seed(time.Now().UTC().UnixNano())
+	http.HandleFunc("/add", QuickAddHandler)
 	http.HandleFunc("/", ShortenerHandler)
 }
 
@@ -58,6 +62,38 @@ func redirectHandler(loc string, w http.ResponseWriter) {
 
 func FBRedirect(w http.ResponseWriter, r *http.Request) {
 	redirectHandler("https://www.facebook.com/messages/conversation-807942749260663", w)
+}
+
+func QuickAddHandler(w http.ResponseWriter, r *http.Request) {
+	secret := r.FormValue("key")
+	if !isValidSecret(secret) {
+		fmt.Printf(secret)
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+	c := appengine.NewContext(r)
+
+	pastLinks := make([]URLMatch, 0, 100)
+	_, derr := datastore.NewQuery("URLMatch").Order("-Created").Limit(100).GetAll(c, &pastLinks)
+	if derr != nil {
+		http.Error(w, derr.Error(), http.StatusInternalServerError)
+	}
+
+	resURL, err := createShortenedURL(r)
+	if err != "" {
+		http.Error(w, err, http.StatusInternalServerError)
+	} else {
+		fullURL := fmt.Sprintf("%v/%v", r.Host, resURL)
+		indexTmpl.Execute(w, IndexTemplateParams{
+			CreatedURL: fullURL,
+			Host:       r.Host,
+			PastLinks:  pastLinks,
+		})
+	}
+}
+
+func isValidSecret(secret string) bool {
+	return secret == "F(Gn@iThoFE3n6NmE$Qw5**E8"
 }
 
 func isValidPath(path string) bool {
@@ -81,6 +117,10 @@ func createShortenedURL(r *http.Request) (string, string) {
 			return "", "invalid path"
 		} else if !isValidTargetURL(target) {
 			return "", "invalid target url"
+		}
+
+		if !strings.Contains(target, "http://") && !strings.Contains(target, "https://") {
+			target = fmt.Sprintf("http://%v", target)
 		}
 		c := appengine.NewContext(r)
 		u := URLMatch{
@@ -108,12 +148,21 @@ func writeNotFound(w http.ResponseWriter, path string) {
 
 func ShortenerHandler(w http.ResponseWriter, r *http.Request) {
 	reqPath := r.URL.Path
+	c := appengine.NewContext(r)
+
+	pastLinks := make([]URLMatch, 0, 100)
+	_, err := datastore.NewQuery("URLMatch").Order("-Created").Limit(100).GetAll(c, &pastLinks)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 
 	if reqPath == "/" {
 		if r.Method == "GET" {
 			indexTmpl.Execute(w, IndexTemplateParams{
 				Path:      r.FormValue("path"),
-				TargetURL: r.FormValue("targetURL"),
+				TargetURL: r.FormValue("target"),
+				Host:      r.Host,
+				PastLinks: pastLinks,
 			})
 		} else if r.Method == "POST" {
 			resURL, err := createShortenedURL(r)
@@ -123,11 +172,12 @@ func ShortenerHandler(w http.ResponseWriter, r *http.Request) {
 				fullURL := fmt.Sprintf("%v/%v", r.Host, resURL)
 				indexTmpl.Execute(w, IndexTemplateParams{
 					CreatedURL: fullURL,
+					Host:       r.Host,
+					PastLinks:  pastLinks,
 				})
 			}
 		}
 	} else {
-		c := appengine.NewContext(r)
 		match := make([]URLMatch, 0, 1)
 		_, err := datastore.NewQuery("URLMatch").Filter("Path =", reqPath[1:]).Limit(1).GetAll(c, &match)
 		if err != nil {

@@ -26,7 +26,7 @@
         </p>
     {{end}}
 
-    <form action="/" method="POST">
+    <form action="/" method="POST" style="margin-bottom: 20px;">
         <h1>
             hms.space/
             <input type="text" name="path" placeholder="Path (optional)" value="{{.Path}}"/>
@@ -37,5 +37,20 @@
         </h2>
         <input type="submit" value="Go!" />
     </form>
+    <table class="table table-striped" style="width: 1100px; margin: auto">
+        {{range .PastLinks}}
+            <tr>
+                <td>
+                    <a href="//{{$.Host}}/{{.Path}}">{{$.Host}}/{{.Path}}</a>
+                </td>
+                <td>
+                    <a href="{{.TargetURL}}">{{.TargetURL}}</a>
+                </td>
+                <td>
+                    {{.Created}}
+                </td>
+            </tr>
+        {{end}}
+    </table>
     </body>
 </html>
