@@ -57,6 +57,11 @@ func init() {
 
 func QuickAddHandler(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
+
+	if handleUserAuth(w, r) == nil {
+		return
+	}
+
 	pastLinks, _ := getPastLinks(c, 100)
 
 	resURL, err := createShortenedURL(r)
@@ -142,6 +147,21 @@ func isAuthorizedUser(user user.User) bool {
 	return ok
 }
 
+func handleUserAuth(w http.ResponseWriter, r *http.Request) *user.User {
+	c := appengine.NewContext(r)
+	u := user.Current(c)
+	if u == nil {
+		loginUrl, _ := user.LoginURL(c, "/")
+		http.Redirect(w, r, loginUrl, http.StatusFound)
+		return nil
+	} else if !isAuthorizedUser(*u) {
+		w.Write([]byte("Email not in authorized list. Message me to get access. "))
+		return nil
+	}
+
+	return u
+}
+
 func ShortenerHandler(w http.ResponseWriter, r *http.Request) {
 	reqPath := r.URL.Path
 	c := appengine.NewContext(r)
@@ -152,17 +172,9 @@ func ShortenerHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if reqPath == "/" {
-		u := user.Current(c)
-
-		if u == nil {
-			loginUrl, _ := user.LoginURL(c, "/")
-			http.Redirect(w, r, loginUrl, http.StatusFound)
-			return
-		} else if !isAuthorizedUser(*u) {
-			w.Write([]byte("Email not in authorized list. Message me to get access. "))
+		if handleUserAuth(w, r) == nil {
 			return
 		}
-
 		if r.Method == "GET" {
 			indexTmpl.Execute(w, IndexTemplateParams{
 				Path:      r.FormValue("path"),

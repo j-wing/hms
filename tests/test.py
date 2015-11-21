@@ -6,6 +6,8 @@ from selenium.common.exceptions import NoSuchElementException
 TEST_PAGE_URL = "http://bob.com/"
 TEST_PAGE_PATH = "mypath"
 
+BASE_URL = None
+
 
 def _get_form_fields(driver):
     path_field = driver.find_element_by_name("path")
@@ -49,6 +51,8 @@ def test_can_create_explicit_path(driver):
 
 def test_access_requires_login(driver):
     assert driver.current_url.count("/_ah/login") != 0
+    driver.get("%s/add" % BASE_URL)
+    assert driver.current_url.count("/_ah/login") != 0
     login(driver)
     return True
 
@@ -76,6 +80,8 @@ TESTS = [
         ]
 
 def main(url):
+    global BASE_URL
+    BASE_URL = url
     driver = webdriver.Firefox()
 
     failed = []
