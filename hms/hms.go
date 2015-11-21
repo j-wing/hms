@@ -40,10 +40,6 @@ func makeLinkKey(c appengine.Context) *datastore.Key {
 	return datastore.NewKey(c, "Link", "default_urlmatch", 0, nil)
 }
 
-func makeAPIKey(c appengine.Context) *datastore.Key {
-	return datastore.NewKey(c, "APIKey", "default_apikey", 0, nil)
-}
-
 func createRandomPath(n int) string {
 	b := make([]byte, n)
 	for i := range b {
@@ -151,6 +147,11 @@ func getPastLinks(c appengine.Context, limit int) ([]Link, error) {
 	return pastLinks, err
 }
 
+func isAuthorizedUser(user user.User) bool {
+	_, ok := ALLOWED_EMAILS[user.Email]
+	return ok
+}
+
 func ShortenerHandler(w http.ResponseWriter, r *http.Request) {
 	reqPath := r.URL.Path
 	c := appengine.NewContext(r)
@@ -166,6 +167,9 @@ func ShortenerHandler(w http.ResponseWriter, r *http.Request) {
 		if u == nil {
 			loginUrl, _ := user.LoginURL(c, "/")
 			http.Redirect(w, r, loginUrl, http.StatusFound)
+			return
+		} else if !isAuthorizedUser(*u) {
+			w.Write([]byte("Email not in authorized list. Message me to get access. "))
 			return
 		}
 

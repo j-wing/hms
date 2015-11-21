@@ -2,7 +2,7 @@ import sys
 
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
-
+from selenium.common.exceptions import NoSuchElementException
 TEST_PAGE_URL = "http://bob.com/"
 TEST_PAGE_PATH = "mypath"
 
@@ -34,8 +34,9 @@ def _test_create_shortlink(driver, target_path, target_url):
 def test_can_create_random_path(driver):
    return _test_create_shortlink(driver, "", TEST_PAGE_URL) 
 
-def login(driver):
+def login(driver, email="test@example.com"):
     if driver.current_url.count("/_ah/login") != 0:
+        driver.find_element_by_id("email").send_keys((Keys.BACKSPACE*20) + email)
         driver.find_element_by_id("submit-login").click()
 
 def test_can_create_explicit_path(driver):
@@ -47,7 +48,18 @@ def test_access_requires_login(driver):
     login(driver)
     return True
 
+def test_unauthorized_email_fails(driver):
+    login(driver, email="thisshouldnot@work.com")
+    try:
+        driver.find_element_by_name("path")
+    except NoSuchElementException:
+        driver.delete_all_cookies()
+        return True
+    driver.delete_all_cookies()
+    return False
+
 TESTS = [
+        test_unauthorized_email_fails,
         test_access_requires_login,
         test_can_create_explicit_path,
         test_can_create_random_path,
@@ -74,6 +86,7 @@ def main(url):
     passed = len(TESTS) - failed_count
     print "Results:", passed, "out of", len(TESTS), "passed (", failed_count, "failed). "
     print "\n\t - ".join(failed_test.func_name for failed_test in failed)
+    driver.quit()
 
 if __name__ == "__main__":
     if len(sys.argv) > 2:
