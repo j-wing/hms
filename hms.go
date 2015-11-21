@@ -11,6 +11,7 @@ import (
 
 	"appengine"
 	"appengine/datastore"
+	"appengine/user"
 )
 
 var (
@@ -37,7 +38,10 @@ type Link struct {
 
 func makeLinkKey(c appengine.Context) *datastore.Key {
 	return datastore.NewKey(c, "Link", "default_urlmatch", 0, nil)
+}
 
+func makeAPIKey(c appengine.Context) *datastore.Key {
+	return datastore.NewKey(c, "APIKey", "default_apikey", 0, nil)
 }
 
 func createRandomPath(n int) string {
@@ -61,13 +65,9 @@ func QuickAddHandler(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
-	c := appengine.NewContext(r)
 
-	pastLinks := make([]Link, 0, 100)
-	_, derr := datastore.NewQuery("Link").Order("-Created").Limit(100).GetAll(c, &pastLinks)
-	if derr != nil {
-		http.Error(w, derr.Error(), http.StatusInternalServerError)
-	}
+	c := appengine.NewContext(r)
+	pastLinks, _ := getPastLinks(c, 100)
 
 	resURL, err := createShortenedURL(r)
 	if err != nil {
@@ -136,26 +136,39 @@ func writeNotFound(w http.ResponseWriter, path string) {
 	})
 }
 
-func getMatchingLink(requestPath string, c appengine.Context) (Link, error) {
+func getMatchingLink(requestPath string, c appengine.Context) ([]Link, error) {
 	match := make([]Link, 0, 1)
 	_, err := datastore.NewQuery("Link").Filter("Path =", requestPath[1:]).Limit(1).GetAll(c, &match)
 	if err != nil {
-		return Link{}, err
+		return match, err
 	}
-	return match[0], nil
+	return match, nil
+}
+
+func getPastLinks(c appengine.Context, limit int) ([]Link, error) {
+	pastLinks := make([]Link, 0, 100)
+	_, err := datastore.NewQuery("Link").Order("-Created").Limit(100).GetAll(c, &pastLinks)
+	return pastLinks, err
 }
 
 func ShortenerHandler(w http.ResponseWriter, r *http.Request) {
 	reqPath := r.URL.Path
 	c := appengine.NewContext(r)
 
-	pastLinks := make([]Link, 0, 100)
-	_, err := datastore.NewQuery("Link").Order("-Created").Limit(100).GetAll(c, &pastLinks)
+	pastLinks, err := getPastLinks(c, 100)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
 	if reqPath == "/" {
+		u := user.Current(c)
+
+		if u == nil {
+			loginUrl, _ := user.LoginURL(c, "/")
+			http.Redirect(w, r, loginUrl, http.StatusFound)
+			return
+		}
+
 		if r.Method == "GET" {
 			indexTmpl.Execute(w, IndexTemplateParams{
 				Path:      r.FormValue("path"),
@@ -177,13 +190,16 @@ func ShortenerHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	} else {
-		link, err := getMatchingLink(reqPath, c)
+		link_arr, err := getMatchingLink(reqPath, c)
 
-		if err != nil {
-			w.Header().Set("Location", link.TargetURL)
-			w.WriteHeader(http.StatusFound)
+		if err == nil {
+			if len(link_arr) > 0 {
+				http.Redirect(w, r, link_arr[0].TargetURL, http.StatusFound)
+			} else {
+				writeNotFound(w, reqPath)
+			}
 		} else {
-			writeNotFound(w, reqPath)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	}
 }
