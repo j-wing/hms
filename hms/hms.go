@@ -56,12 +56,6 @@ func init() {
 }
 
 func QuickAddHandler(w http.ResponseWriter, r *http.Request) {
-	secret := r.FormValue("key")
-	if !isValidSecret(secret) {
-		http.Redirect(w, r, "/", http.StatusFound)
-		return
-	}
-
 	c := appengine.NewContext(r)
 	pastLinks, _ := getPastLinks(c, 100)
 
@@ -76,10 +70,6 @@ func QuickAddHandler(w http.ResponseWriter, r *http.Request) {
 			PastLinks:  pastLinks,
 		})
 	}
-}
-
-func isValidSecret(secret string) bool {
-	return secret == "F(Gn@iThoFE3n6NmE$Qw5**E8"
 }
 
 func isValidPath(path string) bool {
@@ -112,7 +102,7 @@ func createShortenedURL(r *http.Request) (string, error) {
 		u := Link{
 			Path:      path,
 			TargetURL: target,
-			Creator:   "",
+			Creator:   user.Current(c).Email,
 			Created:   time.Now(),
 		}
 
