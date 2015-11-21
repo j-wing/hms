@@ -24,12 +24,16 @@ def _test_create_shortlink(driver, target_path, target_url):
     target.send_keys(target_url)
     target.send_keys(Keys.RETURN)
 
+    _test_header_link_goes_to(driver, target_url)
+
+    return True
+
+def _test_header_link_goes_to(driver, url):
     msg_header = _get_created_header(driver)
     link = msg_header.find_element_by_tag_name("a")
     link.click()
-    assert driver.current_url == target_url
+    assert driver.current_url == url
     return True
-
 
 def test_can_create_random_path(driver):
    return _test_create_shortlink(driver, "", TEST_PAGE_URL) 
@@ -58,11 +62,17 @@ def test_unauthorized_email_fails(driver):
     driver.delete_all_cookies()
     return False
 
+def test_can_use_quick_add(driver):
+    driver.get("{0}add?target={1}".format(driver.current_url, TEST_PAGE_URL))
+    return _test_header_link_goes_to(driver, TEST_PAGE_URL)
+
+
 TESTS = [
         test_unauthorized_email_fails,
         test_access_requires_login,
         test_can_create_explicit_path,
         test_can_create_random_path,
+        test_can_use_quick_add
         ]
 
 def main(url):
