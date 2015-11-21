@@ -38,6 +38,20 @@
         <input type="submit" value="Go!" />
     </form>
     <table class="table table-striped" style="width: 1100px; margin: auto">
+        <thead>
+            <th>
+                Short URL:
+            </th>
+            <th>
+                Goes to:
+            </th>
+            <th>
+                Creator:
+            </th>
+            <th>
+                Created:
+            </th>
+        </thead>
         {{range .PastLinks}}
             <tr>
                 <td>
@@ -47,7 +61,9 @@
                     <a href="{{.TargetURL}}">{{.TargetURL}}</a>
                 </td>
                 <td>
-                    {{.Created}}
+                    {{.Creator}}
+                <td>
+                    {{.FormatCreated}}
                 </td>
             </tr>
         {{end}}

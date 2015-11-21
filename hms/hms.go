@@ -36,6 +36,10 @@ type Link struct {
 	Created   time.Time
 }
 
+func (l *Link) FormatCreated() string {
+	return l.Created.Add(time.Hour * -8).Format("3:04pm, Monday, January 2")
+}
+
 func makeLinkKey(c appengine.Context) *datastore.Key {
 	return datastore.NewKey(c, "Link", "default_urlmatch", 0, nil)
 }
