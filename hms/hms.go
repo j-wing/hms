@@ -56,6 +56,7 @@ func createRandomPath(n int) string {
 
 func init() {
 	rand.Seed(time.Now().UTC().UnixNano())
+	http.Handle("/api/", appHandler(APIHandler))
 	http.HandleFunc("/add", QuickAddHandler)
 	http.HandleFunc("/", ShortenerHandler)
 }
