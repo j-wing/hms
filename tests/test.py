@@ -5,6 +5,7 @@ from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import NoSuchElementException
 TEST_PAGE_URL = "http://bob.com/"
 TEST_PAGE_PATH = "mypath"
+TEST_PAGE_PATH_TWO = "mypath2"
 
 BASE_URL = None
 
@@ -70,13 +71,20 @@ def test_can_use_quick_add(driver):
     driver.get("{0}add?target={1}".format(driver.current_url, TEST_PAGE_URL))
     return _test_header_link_goes_to(driver, TEST_PAGE_URL)
 
+def test_multiple_links_with_same_path_fail(driver):
+    try:
+        _test_create_shortlink(driver, TEST_PAGE_PATH, TEST_PAGE_URL)
+    except NoSuchElementException:
+        return True
+    return False
 
 TESTS = [
         test_unauthorized_email_fails,
         test_access_requires_login,
         test_can_create_explicit_path,
         test_can_create_random_path,
-        test_can_use_quick_add
+        test_can_use_quick_add,
+        test_multiple_links_with_same_path_fail,
         ]
 
 def main(url):

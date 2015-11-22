@@ -111,6 +111,12 @@ func createShortenedURL(r *http.Request) (string, error) {
 		}
 
 		c := appengine.NewContext(r)
+
+		existingLinkCount, err := datastore.NewQuery("Link").Filter("Path =", path).Count(c)
+		if existingLinkCount != 0 {
+			return "", errors.New("There already exists a link with that path. ")
+		}
+
 		u := Link{
 			Path:      path,
 			TargetURL: parsedUrl.String(),
