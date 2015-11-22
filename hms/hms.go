@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -85,10 +86,6 @@ func isValidPath(path string) bool {
 	return !strings.Contains(path, "/")
 }
 
-func isValidTargetURL(target string) bool {
-	return !strings.Contains(target, "hms.space")
-}
-
 func createShortenedURL(r *http.Request) (string, error) {
 	path := r.FormValue("path")
 	target := r.FormValue("target")
@@ -100,23 +97,29 @@ func createShortenedURL(r *http.Request) (string, error) {
 			path = createRandomPath(4)
 		} else if !isValidPath(path) {
 			return "", errors.New("invalid path")
-		} else if !isValidTargetURL(target) {
-			return "", errors.New("invalid target url")
 		}
 
-		if !strings.Contains(target, "http://") && !strings.Contains(target, "https://") {
-			target = fmt.Sprintf("http://%v", target)
+		parsedUrl, err := url.Parse(target)
+		if err != nil {
+			return "", err
+		} else if parsedUrl.Host == r.Host {
+			return "", errors.New("Don't try to make redirect loops.")
 		}
+
+		if parsedUrl.Scheme == "" {
+			parsedUrl.Scheme = "http"
+		}
+
 		c := appengine.NewContext(r)
 		u := Link{
 			Path:      path,
-			TargetURL: target,
+			TargetURL: parsedUrl.String(),
 			Creator:   user.Current(c).Email,
 			Created:   time.Now(),
 		}
 
 		key := datastore.NewIncompleteKey(c, "Link", makeLinkKey(c))
-		_, err := datastore.Put(c, key, &u)
+		_, err = datastore.Put(c, key, &u)
 		if err != nil {
 			return "", err
 		}
