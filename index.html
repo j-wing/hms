@@ -37,6 +37,7 @@
         </h2>
         <input type="submit" value="Go!" />
     </form>
+    {{if .PastLinks}}
     <table class="table table-striped" style="width: 1100px; margin: auto">
         <thead>
             <th>
@@ -68,5 +69,6 @@
             </tr>
         {{end}}
     </table>
+    {{end}}
     </body>
 </html>
