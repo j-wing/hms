@@ -45,17 +45,6 @@ func makeLinkKey(c appengine.Context) *datastore.Key {
 	return datastore.NewKey(c, "Link", "default_urlmatch", 0, nil)
 }
 
-type URLMatch struct {
-	Path      string
-	TargetURL string
-	Creator   string
-	Created   time.Time
-}
-
-func makeURLKey(c appengine.Context) *datastore.Key {
-	return datastore.NewKey(c, "URLMatch", "default_urlmatch", 0, nil)
-}
-
 func createRandomPath(n int) string {
 	b := make([]byte, n)
 	for i := range b {
@@ -69,33 +58,7 @@ func init() {
 	rand.Seed(time.Now().UTC().UnixNano())
 	http.Handle("/api/", appHandler(APIHandler))
 	http.HandleFunc("/add", QuickAddHandler)
-	http.HandleFunc("/migrate", MigrateHandler)
 	http.HandleFunc("/", ShortenerHandler)
-}
-
-func MigrateHandler(w http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
-	results := make([]URLMatch, 0, 150)
-	keys, _ := datastore.NewQuery("URLMatch").GetAll(c, &results)
-
-	if r.FormValue("delete") == "1" {
-		datastore.DeleteMulti(c, keys)
-		w.Write([]byte("Delete completed!"))
-	} else {
-		for _, url := range results {
-			u := Link{
-				Path:      url.Path,
-				TargetURL: url.TargetURL,
-				Creator:   "",
-				Created:   url.Created,
-			}
-
-			key := datastore.NewIncompleteKey(c, "Link", makeLinkKey(c))
-			datastore.Put(c, key, &u)
-		}
-		w.Write([]byte(fmt.Sprintf("Migration done for %d items!", len(keys))))
-	}
-
 }
 
 func QuickAddHandler(w http.ResponseWriter, r *http.Request) {
@@ -216,15 +179,6 @@ func handleUserAuth(w http.ResponseWriter, r *http.Request) *user.User {
 func ShortenerHandler(w http.ResponseWriter, r *http.Request) {
 	reqPath := r.URL.Path
 	c := appengine.NewContext(r)
-	n := URLMatch{
-		Path:      "joe",
-		TargetURL: "http://bob.com",
-		Creator:   "",
-		Created:   time.Now(),
-	}
-
-	key := datastore.NewIncompleteKey(c, "URLMatch", makeURLKey(c))
-	datastore.Put(c, key, &n)
 
 	pastLinks, err := getPastLinks(c, 100)
 	if err != nil {
