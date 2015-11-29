@@ -11,3 +11,10 @@ p.bg-primary {
     color: white !important;
     text-decoration: underline;
 }
+
+td {
+    max-width: 730px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
