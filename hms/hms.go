@@ -19,7 +19,7 @@ var (
 	indexTmpl = template.Must(template.ParseFiles("index.html"))
 )
 
-const LETTERS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+const LETTERS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 type IndexTemplateParams struct {
 	Path       string
@@ -56,9 +56,44 @@ func createRandomPath(n int) string {
 
 func init() {
 	rand.Seed(time.Now().UTC().UnixNano())
+	http.HandleFunc("/add_api_key", APIKeyAddHandler)
 	http.Handle("/api/", appHandler(APIHandler))
 	http.HandleFunc("/add", QuickAddHandler)
 	http.HandleFunc("/", ShortenerHandler)
+}
+
+func APIKeyAddHandler(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	u := user.Current(c)
+	if u == nil {
+		loginUrl, _ := user.LoginURL(c, r.URL.RequestURI())
+		http.Redirect(w, r, loginUrl, http.StatusFound)
+		return
+	} else {
+		if !u.Admin {
+			w.Write([]byte("You're not an admin. Go away."))
+		} else {
+			key := createRandomPath(26)
+			owner := r.FormValue("owner")
+
+			if owner == "" {
+				w.Write([]byte("You forgot a parameter."))
+			} else {
+				apiKey := APIKey{
+					APIKey:     key,
+					OwnerEmail: owner,
+				}
+				dkey := datastore.NewIncompleteKey(c, "APIKey", makeAPIKey(c))
+				_, err := datastore.Put(c, dkey, &apiKey)
+				if err != nil {
+					w.Write([]byte(fmt.Sprintf("error! %s", err.Error())))
+				} else {
+					w.Write([]byte(fmt.Sprintf("success! Added key: %s", key)))
+
+				}
+			}
+		}
+	}
 }
 
 func QuickAddHandler(w http.ResponseWriter, r *http.Request) {
