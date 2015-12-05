@@ -153,10 +153,21 @@ func createShortenedURL(r *http.Request) (string, error) {
 			return "", errors.New("There already exists a link with that path. ")
 		}
 
+		currUser := user.Current(c)
+		var creator string
+		if currUser == nil {
+			creator = r.FormValue("creator")
+			if creator == "" {
+				return "", errors.New("No creator provided.")
+			}
+		} else {
+			creator = currUser.Email
+		}
+
 		u := Link{
 			Path:      path,
 			TargetURL: parsedUrl.String(),
-			Creator:   user.Current(c).Email,
+			Creator:   creator,
 			Created:   time.Now(),
 		}
 
