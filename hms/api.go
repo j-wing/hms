@@ -27,11 +27,17 @@ type AddSuccessResponse struct {
 	ResultURL string
 }
 
+type ResolveResponse struct {
+	Success bool
+	Result  Link
+}
+
 type appHandler func(http.ResponseWriter, *http.Request) *appError
 type apiHandler func(http.ResponseWriter, *http.Request, APIKey) *appError
 
 var apiRoutes = map[string]apiHandler{
-	"/api/add": handleAdd,
+	"/api/add":     handleAdd,
+	"/api/resolve": handleResolve,
 }
 
 func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -65,6 +71,30 @@ func handleAdd(w http.ResponseWriter, r *http.Request, apiKey APIKey) *appError 
 
 	absResURL := fmt.Sprintf("http://%s/%s", r.Host, resURL)
 	resp := &AddSuccessResponse{true, absResURL}
+	respJSON, _ := json.Marshal(resp)
+	w.Write(respJSON)
+	return nil
+}
+
+func handleResolve(w http.ResponseWriter, r *http.Request, apiKey APIKey) *appError {
+	if r.Method != "GET" {
+		return &appError{nil, fmt.Sprintf("Invalid request method: %s", r.Method), 401}
+	}
+
+	reqPath := r.FormValue("path")
+	if reqPath == "" {
+		return &appError{nil, "The `path` parameter is required. ", 401}
+	}
+	c := appengine.NewContext(r)
+	linkResults, err := getMatchingLink(reqPath, c)
+
+	var resp *ResolveResponse
+
+	if err != nil || len(linkResults) != 1 {
+		resp = &ResolveResponse{false, Link{}}
+	} else {
+		resp = &ResolveResponse{true, linkResults[0]}
+	}
 	respJSON, _ := json.Marshal(resp)
 	w.Write(respJSON)
 	return nil
