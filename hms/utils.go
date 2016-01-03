@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-const ALPHABET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-"
+const ALPHABET = "BV-dvsoXDyjIi4lrqJLQ0at6KYxHh8e_G3OZf1FEw7nU9C2mugz5RSMNWTPAcbkp"
 
 func ShortURLEncode(n int) string {
 	base := len(ALPHABET)
