@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -16,7 +17,7 @@ import (
 )
 
 var (
-	indexTmpl = template.Must(template.ParseFiles("index.html"))
+	indexTmpl *template.Template
 )
 
 const LETTERS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -55,6 +56,15 @@ func createRandomPath(n int) string {
 }
 
 func init() {
+	var baseDir string
+
+	if _, err := os.Stat("./tmpl"); err == nil {
+		baseDir = "./tmpl"
+	} else {
+		baseDir = "../tmpl"
+	}
+
+	indexTmpl = template.Must(template.ParseFiles(baseDir + "/index.html"))
 	rand.Seed(time.Now().UTC().UnixNano())
 	http.HandleFunc("/add_api_key", APIKeyAddHandler)
 	http.Handle("/api/", appHandler(APIHandler))
