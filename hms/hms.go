@@ -11,9 +11,11 @@ import (
 	"strings"
 	"time"
 
-	"appengine"
-	"appengine/datastore"
-	"appengine/user"
+	"golang.org/x/net/context"
+
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/datastore"
+	"google.golang.org/appengine/user"
 )
 
 var (
@@ -42,7 +44,7 @@ func (l *Link) FormatCreated() string {
 	return l.Created.Add(time.Hour * -8).Format("3:04pm, Monday, January 2")
 }
 
-func makeLinkKey(c appengine.Context) *datastore.Key {
+func makeLinkKey(c context.Context) *datastore.Key {
 	return datastore.NewKey(c, "Link", "default_urlmatch", 0, nil)
 }
 
@@ -197,7 +199,7 @@ func writeNotFound(w http.ResponseWriter, path string) {
 	})
 }
 
-func getMatchingLink(requestPath string, c appengine.Context) ([]Link, error) {
+func getMatchingLink(requestPath string, c context.Context) ([]Link, error) {
 	match := make([]Link, 0, 1)
 	_, err := datastore.NewQuery("Link").Filter("Path =", requestPath[1:]).Limit(1).GetAll(c, &match)
 	if err != nil {
@@ -206,7 +208,7 @@ func getMatchingLink(requestPath string, c appengine.Context) ([]Link, error) {
 	return match, nil
 }
 
-func getPastLinks(c appengine.Context, limit int) ([]Link, error) {
+func getPastLinks(c context.Context, limit int) ([]Link, error) {
 	pastLinks := make([]Link, 0, 100)
 	_, err := datastore.NewQuery("Link").Order("-Created").Limit(100).GetAll(c, &pastLinks)
 	return pastLinks, err

@@ -6,8 +6,11 @@ import (
 	"net/http"
 	"time"
 
-	"appengine"
-	"appengine/datastore"
+	"golang.org/x/net/context"
+
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/datastore"
+	"google.golang.org/appengine/log"
 )
 
 type APIKey struct {
@@ -45,7 +48,7 @@ func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if e := fn(w, r); e != nil {
 		c := appengine.NewContext(r)
 		if e.Code == 500 {
-			c.Errorf("error recorded: %v; message: %v", e.Error, e.Message)
+			log.Errorf(c, "error recorded: %v; message: %v", e.Error, e.Message)
 			http.Error(w, e.Message, e.Code)
 		} else {
 			asJson, _ := json.Marshal(e)
@@ -54,7 +57,7 @@ func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func makeAPIKey(c appengine.Context) *datastore.Key {
+func makeAPIKey(c context.Context) *datastore.Key {
 	return datastore.NewKey(c, "APIKey", "default_apikey", 0, nil)
 }
 
