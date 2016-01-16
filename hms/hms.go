@@ -1,77 +1,64 @@
 package hms
 
 import (
-	"errors"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"math/rand"
 	"net/http"
-	"net/url"
-	"os"
+	//"net/url"
 	"strings"
 	"time"
 
-	"golang.org/x/net/context"
+	//"golang.org/x/net/context"
 
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/datastore"
+	"google.golang.org/appengine/log"
 	"google.golang.org/appengine/user"
 )
 
-var (
-	indexTmpl *template.Template
-)
-
-const LETTERS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-
-type IndexTemplateParams struct {
-	Path       string
-	TargetURL  string
-	Message    string
-	CreatedURL string
-	Host       string
-	PastLinks  []Link
+type appError struct {
+	Error   error
+	Message string
+	Code    int
 }
+type appHandler func(http.ResponseWriter, *http.Request) *appError
 
-type Link struct {
-	Path      string
-	TargetURL string
-	Creator   string
-	Created   time.Time
-}
-
-func (l *Link) FormatCreated() string {
-	return l.Created.Add(time.Hour * -8).Format("3:04pm, Monday, January 2")
-}
-
-func makeLinkKey(c context.Context) *datastore.Key {
-	return datastore.NewKey(c, "Link", "default_urlmatch", 0, nil)
-}
-
-func createRandomPath(n int) string {
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = LETTERS[rand.Intn(len(LETTERS))]
-	}
-	return string(b)
-
-}
+var templateBaseDir = getTemplateBaseDir()
+var defaultErrTmpl = template.Must(getTemplate("err_default.html"))
 
 func init() {
-	var baseDir string
-
-	if _, err := os.Stat("./tmpl"); err == nil {
-		baseDir = "./tmpl"
-	} else {
-		baseDir = "../tmpl"
-	}
-
-	indexTmpl = template.Must(template.ParseFiles(baseDir + "/index.html"))
 	rand.Seed(time.Now().UTC().UnixNano())
+
 	http.HandleFunc("/add_api_key", APIKeyAddHandler)
 	http.Handle("/api/", appHandler(APIHandler))
-	http.HandleFunc("/add", QuickAddHandler)
-	http.HandleFunc("/", ShortenerHandler)
+	http.Handle("/", appHandler(ShortenerHandler))
+	//http.HandleFunc("/add", QuickAddHandler)
+	//http.HandleFunc("/", ShortenerHandler)
+}
+
+func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if e := fn(w, r); e != nil {
+		c := appengine.NewContext(r)
+		if e.Code == 500 {
+			log.Errorf(c, "error recorded: %v; message: %v", e.Error, e.Message)
+			http.Error(w, e.Message, e.Code)
+		} else {
+			if strings.HasPrefix(r.URL.Path, "/api") {
+				asJson, _ := json.Marshal(e)
+				http.Error(w, string(asJson), e.Code)
+			} else {
+				w.WriteHeader(e.Code)
+				errTmpl, err := getErrorTemplate(e)
+				if err != nil {
+					defaultErrTmpl.Execute(w, e)
+				} else {
+					errTmpl.Execute(w, e)
+				}
+			}
+		}
+	}
 }
 
 func APIKeyAddHandler(w http.ResponseWriter, r *http.Request) {
@@ -85,7 +72,7 @@ func APIKeyAddHandler(w http.ResponseWriter, r *http.Request) {
 		if !u.Admin {
 			w.Write([]byte("You're not an admin. Go away."))
 		} else {
-			key := createRandomPath(26)
+			key := randomString(26)
 			owner := r.FormValue("owner")
 
 			if owner == "" {
@@ -108,6 +95,7 @@ func APIKeyAddHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+/*
 func QuickAddHandler(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 
@@ -199,85 +187,4 @@ func writeNotFound(w http.ResponseWriter, path string) {
 	})
 }
 
-func getMatchingLink(requestPath string, c context.Context) ([]Link, error) {
-	match := make([]Link, 0, 1)
-	_, err := datastore.NewQuery("Link").Filter("Path =", requestPath[1:]).Limit(1).GetAll(c, &match)
-	if err != nil {
-		return match, err
-	}
-	return match, nil
-}
-
-func getPastLinks(c context.Context, limit int) ([]Link, error) {
-	pastLinks := make([]Link, 0, 100)
-	_, err := datastore.NewQuery("Link").Order("-Created").Limit(100).GetAll(c, &pastLinks)
-	return pastLinks, err
-}
-
-func isAuthorizedUser(user user.User) bool {
-	_, ok := ALLOWED_EMAILS[user.Email]
-	return ok
-}
-
-func handleUserAuth(w http.ResponseWriter, r *http.Request) *user.User {
-	c := appengine.NewContext(r)
-	u := user.Current(c)
-	if u == nil {
-		loginUrl, _ := user.LoginURL(c, "/")
-		http.Redirect(w, r, loginUrl, http.StatusFound)
-		return nil
-	} else if !isAuthorizedUser(*u) {
-		w.Write([]byte("Email not in authorized list. Message me to get access. "))
-		return nil
-	}
-
-	return u
-}
-
-func ShortenerHandler(w http.ResponseWriter, r *http.Request) {
-	reqPath := r.URL.Path
-	c := appengine.NewContext(r)
-
-	pastLinks, err := getPastLinks(c, 100)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-
-	if reqPath == "/" {
-		if handleUserAuth(w, r) == nil {
-			return
-		}
-		if r.Method == "GET" {
-			indexTmpl.Execute(w, IndexTemplateParams{
-				Path:      r.FormValue("path"),
-				TargetURL: r.FormValue("target"),
-				Host:      r.Host,
-				PastLinks: pastLinks,
-			})
-		} else if r.Method == "POST" {
-			resURL, err := createShortenedURL(r)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-			} else {
-				fullURL := fmt.Sprintf("%v/%v", r.Host, resURL)
-				indexTmpl.Execute(w, IndexTemplateParams{
-					CreatedURL: fullURL,
-					Host:       r.Host,
-					PastLinks:  pastLinks,
-				})
-			}
-		}
-	} else {
-		link_arr, err := getMatchingLink(reqPath, c)
-
-		if err == nil {
-			if len(link_arr) > 0 {
-				http.Redirect(w, r, link_arr[0].TargetURL, http.StatusFound)
-			} else {
-				writeNotFound(w, reqPath)
-			}
-		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-	}
-}
+*/

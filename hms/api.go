@@ -1,29 +1,13 @@
 package hms
 
 import (
-	"encoding/json"
+	//"encoding/json"
 	"fmt"
 	"net/http"
-	"time"
-
-	"golang.org/x/net/context"
 
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/datastore"
-	"google.golang.org/appengine/log"
 )
-
-type APIKey struct {
-	APIKey     string
-	OwnerEmail string
-	Created    time.Time
-}
-
-type appError struct {
-	Error   error
-	Message string
-	Code    int
-}
 
 type AddSuccessResponse struct {
 	Success   bool
@@ -35,7 +19,6 @@ type ResolveResponse struct {
 	Result  Link
 }
 
-type appHandler func(http.ResponseWriter, *http.Request) *appError
 type apiHandler func(http.ResponseWriter, *http.Request, APIKey) *appError
 
 var apiRoutes = map[string]apiHandler{
@@ -43,40 +26,23 @@ var apiRoutes = map[string]apiHandler{
 	"/api/resolve": handleResolve,
 }
 
-func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	if e := fn(w, r); e != nil {
-		c := appengine.NewContext(r)
-		if e.Code == 500 {
-			log.Errorf(c, "error recorded: %v; message: %v", e.Error, e.Message)
-			http.Error(w, e.Message, e.Code)
-		} else {
-			asJson, _ := json.Marshal(e)
-			http.Error(w, string(asJson), e.Code)
-		}
-	}
-}
-
-func makeAPIKey(c context.Context) *datastore.Key {
-	return datastore.NewKey(c, "APIKey", "default_apikey", 0, nil)
-}
-
 func handleAdd(w http.ResponseWriter, r *http.Request, apiKey APIKey) *appError {
 	if r.Method != "POST" {
 		return &appError{nil, fmt.Sprintf("Invalid request method: %s", r.Method), 401}
 	}
-	resURL, err := createShortenedURL(r)
-	if err != nil {
-		// TODO handle this case better by distinguishing between
-		// bad requests and e.g. datastore errors
-		return &appError{err, err.Error(), 400}
-	}
+	return nil /*
+		resURL, err := createShortenedURL(r)
+		if err != nil {
+			// TODO handle this case better by distinguishing between
+			// bad requests and e.g. datastore errors
+			return &appError{err, err.Error(), 400}
+		}
 
-	absResURL := fmt.Sprintf("http://%s/%s", r.Host, resURL)
-	resp := &AddSuccessResponse{true, absResURL}
-	respJSON, _ := json.Marshal(resp)
-	w.Write(respJSON)
-	return nil
+		absResURL := fmt.Sprintf("http://%s/%s", r.Host, resURL)
+		resp := &AddSuccessResponse{true, absResURL}
+		respJSON, _ := json.Marshal(resp)
+		w.Write(respJSON)
+		return nil*/
 }
 
 func handleResolve(w http.ResponseWriter, r *http.Request, apiKey APIKey) *appError {
@@ -88,21 +54,26 @@ func handleResolve(w http.ResponseWriter, r *http.Request, apiKey APIKey) *appEr
 	if reqPath == "" {
 		return &appError{nil, "The `path` parameter is required. ", 401}
 	}
-	c := appengine.NewContext(r)
-	linkResults, err := getMatchingLink(reqPath, c)
+	//c := appengine.NewContext(r)
+	return nil /*
+		linkResults, err := getMatchingLink(reqPath, c)
 
-	var resp *ResolveResponse
+		var resp *ResolveResponse
 
-	if err != nil || len(linkResults) != 1 {
-		resp = &ResolveResponse{false, Link{}}
-	} else {
-		resp = &ResolveResponse{true, linkResults[0]}
-	}
-	respJSON, _ := json.Marshal(resp)
-	w.Write(respJSON)
-	return nil
+		if err != nil || len(linkResults) != 1 {
+			resp = &ResolveResponse{false, Link{}}
+		} else {
+			resp = &ResolveResponse{true, linkResults[0]}
+		}
+		respJSON, _ := json.Marshal(resp)
+		w.Write(respJSON)
+		return nil*/
 }
 
+// General handler function for all requests to the API
+// In addition to calling the handler function according to the API routes,
+// verifies that a valid API key was provided as a parameter, and
+// sets the response content-type to JSON
 func APIHandler(w http.ResponseWriter, r *http.Request) *appError {
 	apiKey := r.FormValue("apiKey")
 	if apiKey == "" {
@@ -124,5 +95,6 @@ func APIHandler(w http.ResponseWriter, r *http.Request) *appError {
 		return &appError{nil, fmt.Sprintf("No API handler for %s", r.URL.Path), 404}
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	return handler(w, r, apiKeyStruct)
 }

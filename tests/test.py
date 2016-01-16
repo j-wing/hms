@@ -83,7 +83,7 @@ TESTS = [
         test_access_requires_login,
         test_can_create_explicit_path,
         test_can_create_random_path,
-        test_can_use_quick_add,
+#        test_can_use_quick_add,
         test_multiple_links_with_same_path_fail,
         ]
 

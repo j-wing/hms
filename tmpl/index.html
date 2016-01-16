@@ -22,7 +22,7 @@
     {{end}}
     {{if .CreatedURL }}
         <p class="bg-primary">
-        Short link created at: <a href="//{{.CreatedURL}}">http://{{.CreatedURL}}</a>
+        Short link created at: <a href="{{.CreatedURL}}">{{.CreatedURL}}</a>
         </p>
     {{end}}
 
@@ -54,19 +54,21 @@
             </th>
         </thead>
         {{range .PastLinks}}
+          {{if .Path}}
             <tr>
+              <td>
+                <a href="//{{$.Host}}/{{.Path}}">{{$.Host}}/{{.Path}}</a>
+              </td>
+              <td>
+                <a href="{{.TargetURL}}">{{.TargetURL}}</a>
+              </td>
+              <td>
+                {{.Creator}}
                 <td>
-                    <a href="//{{$.Host}}/{{.Path}}">{{$.Host}}/{{.Path}}</a>
-                </td>
-                <td>
-                    <a href="{{.TargetURL}}">{{.TargetURL}}</a>
-                </td>
-                <td>
-                    {{.Creator}}
-                <td>
-                    {{.FormatCreated}}
+                  {{.FormatCreated}}
                 </td>
             </tr>
+          {{end}}
         {{end}}
     </table>
     {{end}}
