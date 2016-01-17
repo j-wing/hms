@@ -82,7 +82,7 @@ func APIKeyAddHandler(w http.ResponseWriter, r *http.Request) {
 					APIKey:     key,
 					OwnerEmail: owner,
 				}
-				dkey := datastore.NewIncompleteKey(c, "APIKey", makeAPIKey(c))
+				dkey := datastore.NewIncompleteKey(c, "APIKey", nil)
 				_, err := datastore.Put(c, dkey, &apiKey)
 				if err != nil {
 					w.Write([]byte(fmt.Sprintf("error! %s", err.Error())))
@@ -117,74 +117,4 @@ func QuickAddHandler(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 }
-
-func isValidPath(path string) bool {
-	return !strings.Contains(path, "/")
-}
-
-func createShortenedURL(r *http.Request) (string, error) {
-	path := r.FormValue("path")
-	target := r.FormValue("target")
-
-	if target == "" {
-		return "", errors.New("empty target")
-	} else {
-		if path == "" {
-			path = createRandomPath(4)
-		} else if !isValidPath(path) {
-			return "", errors.New("invalid path")
-		}
-
-		parsedUrl, err := url.Parse(target)
-		if err != nil {
-			return "", err
-		} else if parsedUrl.Host == r.Host {
-			return "", errors.New("Don't try to make redirect loops.")
-		}
-
-		if parsedUrl.Scheme == "" {
-			parsedUrl.Scheme = "http"
-		}
-
-		c := appengine.NewContext(r)
-
-		existingLinkCount, err := datastore.NewQuery("Link").Filter("Path =", path).Count(c)
-		if existingLinkCount != 0 {
-			return "", errors.New("There already exists a link with that path. ")
-		}
-
-		currUser := user.Current(c)
-		var creator string
-		if currUser == nil {
-			creator = r.FormValue("creator")
-			if creator == "" {
-				return "", errors.New("No creator provided.")
-			}
-		} else {
-			creator = currUser.Email
-		}
-
-		u := Link{
-			Path:      path,
-			TargetURL: parsedUrl.String(),
-			Creator:   creator,
-			Created:   time.Now(),
-		}
-
-		key := datastore.NewIncompleteKey(c, "Link", makeLinkKey(c))
-		_, err = datastore.Put(c, key, &u)
-		if err != nil {
-			return "", err
-		}
-		return path, nil
-	}
-}
-
-func writeNotFound(w http.ResponseWriter, path string) {
-	indexTmpl.Execute(w, IndexTemplateParams{
-		Path:    path[1:],
-		Message: "No entry for that path. Add one?",
-	})
-}
-
 */

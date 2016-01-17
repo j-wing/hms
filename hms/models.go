@@ -16,10 +16,6 @@ type Chat struct {
 	FacebookChatID int64
 }
 
-func makeChatKey(c context.Context) *datastore.Key {
-	return datastore.NewKey(c, "Chat", "default_chat", 0, nil)
-}
-
 func getOrCreateChat(c context.Context, fbChatID int64, keyBuf **datastore.Key) (*Chat, error) {
 	results := make([]Chat, 0, 1)
 	keys, err := datastore.NewQuery("Chat").
@@ -59,16 +55,12 @@ type Link struct {
 	TargetURL string
 	Creator   string
 	Created   time.Time
-	ChatKey   *datastore.Key
+	ChatKey   *datastore.Key `json:"-"`
 }
 
 // Used by templates to format the Link struct's created field.
 func (l *Link) FormatCreated() string {
 	return l.Created.Add(time.Hour * -8).Format("3:04pm, Monday, January 2")
-}
-
-func makeLinkKey(c context.Context) *datastore.Key {
-	return datastore.NewKey(c, "Link", "Link", 0, nil)
 }
 
 func getMatchingLink(c context.Context, fbChatID int64, path string) (*Link, error) {
@@ -112,8 +104,5 @@ type APIKey struct {
 	APIKey     string
 	OwnerEmail string
 	Created    time.Time
-}
-
-func makeAPIKey(c context.Context) *datastore.Key {
-	return datastore.NewKey(c, "APIKey", "default_apikey", 0, nil)
+	valid      bool
 }

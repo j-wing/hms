@@ -82,7 +82,7 @@ func handleChatIndex(w http.ResponseWriter, r *http.Request, params []string) *a
 	path := r.FormValue("path")
 	chatID := r.FormValue("chatID")
 
-	if path != "" {
+	if path != "" && r.Method == "GET" {
 		_, err = getMatchingLinkChatString(c, chatID, path)
 		if err != nil {
 			message = "/" + path + " does not exist. Create it?"
@@ -250,52 +250,3 @@ func createShortenedURL(r *http.Request, chatID int64) (string, error) {
 		return finalPath, nil
 	}
 }
-
-/*
-func oldShortenerHandler(w http.ResponseWriter, r *http.Request) {
-	reqPath := r.URL.Path
-	c := appengine.NewContext(r)
-
-	pastLinks, err := getPastLinks(c, 100)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-
-	if reqPath == "/" {
-		if handleUserAuth(w, r) == nil {
-			return
-		}
-		if r.Method == "GET" {
-			indexTmpl.Execute(w, IndexTemplateParams{
-				Path:      r.FormValue("path"),
-				TargetURL: r.FormValue("target"),
-				Host:      r.Host,
-				PastLinks: pastLinks,
-			})
-		} else if r.Method == "POST" {
-			resURL, err := createShortenedURL(r)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-			} else {
-				fullURL := fmt.Sprintf("%v/%v", r.Host, resURL)
-				indexTmpl.Execute(w, IndexTemplateParams{
-					CreatedURL: fullURL,
-					Host:       r.Host,
-					PastLinks:  pastLinks,
-				})
-			}
-		}
-	} else {
-		link_arr, err := getMatchingLink(reqPath, c)
-
-		if err == nil {
-			if len(link_arr) > 0 {
-				http.Redirect(w, r, link_arr[0].TargetURL, http.StatusFound)
-			} else {
-				writeNotFound(w, reqPath)
-			}
-		} else {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-	}
-}*/
