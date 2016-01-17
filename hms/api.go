@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"golang.org/x/net/context"
+
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/datastore"
 )
@@ -31,12 +33,19 @@ type ListResponse struct {
 	Error   string
 }
 
+type RemoveResponse struct {
+	Success    bool
+	NumRemoved int
+	Error      string
+}
+
 type apiHandler func(http.ResponseWriter, *http.Request, APIKey) *appError
 
 var apiRoutes = map[string]apiHandler{
 	"/api/add":     handleAdd,
 	"/api/resolve": handleResolve,
 	"/api/list":    handleList,
+	"/api/remove":  handleRemove,
 }
 
 func handleAdd(w http.ResponseWriter, r *http.Request, apiKey APIKey) *appError {
@@ -115,12 +124,10 @@ func handleList(w http.ResponseWriter, r *http.Request, apiKey APIKey) *appError
 		}
 	}
 
-	var limit int
-	var offset int
+	var limit, offset int
 
 	var n int64
-	var err1 error
-	var err2 error
+	var err1, err2 error
 
 	if sLimit != "" {
 		n, err1 = strconv.ParseInt(sLimit, 10, 32)
@@ -156,7 +163,6 @@ func handleList(w http.ResponseWriter, r *http.Request, apiKey APIKey) *appError
 	var chat *Chat
 	var chatKey *datastore.Key
 	if fbChatID != -1 {
-
 		chatResults := make([]Chat, 0, 1)
 		chatKeys, err := datastore.NewQuery("Chat").
 			Filter("FacebookChatID =", fbChatID).Limit(1).GetAll(c, &chatResults)
@@ -188,6 +194,80 @@ func handleList(w http.ResponseWriter, r *http.Request, apiKey APIKey) *appError
 		results,
 		chat,
 		"",
+	}
+
+	respJSON, _ := json.Marshal(resp)
+	w.Write(respJSON)
+	return nil
+}
+
+func handleRemove(w http.ResponseWriter, r *http.Request, apiKey APIKey) *appError {
+	if r.Method != "DELETE" {
+		return &appError{nil, fmt.Sprintf("Invalid request method: %s", r.Method), 401}
+	}
+
+	c := appengine.NewContext(r)
+
+	strChatID := r.FormValue("chatID")
+	rmPath := r.FormValue("path")
+
+	var fbChatID int64 = -1
+	var chatKey *datastore.Key
+	var err error
+
+	if strChatID != "" {
+		fbChatID, err = strconv.ParseInt(strChatID, 10, 64)
+		if err != nil {
+			return &appError{nil, "Bad chat ID", 400}
+		}
+		chatKeys, err := datastore.NewQuery("Chat").Filter("FacebookChatID =", fbChatID).
+			KeysOnly().GetAll(c, nil)
+
+		if err != nil {
+			return &appError{err, "Datastore error: " + err.Error(), 400}
+		} else if len(chatKeys) == 0 {
+			return &appError{nil, "Bad chat ID", 400}
+		}
+
+		chatKey = chatKeys[0]
+	} else {
+		chatKey = nil
+	}
+
+	deleted := make([]Link, 0)
+	keysToRemove, err := datastore.NewQuery("Link").
+		Filter("Path =", rmPath).Filter("ChatKey =", chatKey).GetAll(c, &deleted)
+
+	if len(keysToRemove) != 0 {
+		newKeys := make([]*datastore.Key, len(keysToRemove))
+		for i := range keysToRemove {
+			newKeys[i] = datastore.NewIncompleteKey(c, "DeletedLink", nil)
+		}
+
+		err = datastore.RunInTransaction(c, func(tc context.Context) (err error) {
+			_, err = datastore.PutMulti(c, newKeys, deleted)
+			if err != nil {
+				return
+			}
+			err = datastore.DeleteMulti(c, keysToRemove)
+			return
+		}, nil)
+
+	}
+
+	var resp RemoveResponse
+	if err != nil {
+		resp = RemoveResponse{
+			false,
+			0,
+			err.Error(),
+		}
+	} else {
+		resp = RemoveResponse{
+			true,
+			len(keysToRemove),
+			"",
+		}
 	}
 
 	respJSON, _ := json.Marshal(resp)
