@@ -134,7 +134,7 @@ func handleManualShortURL(w http.ResponseWriter, r *http.Request, params []strin
 	}
 
 	urlPath := params[0]
-	strChatID := r.FormValue("chat")
+	strChatID := r.FormValue("chatID")
 
 	c := appengine.NewContext(r)
 	target, err := getMatchingLinkChatString(c, strChatID, urlPath)

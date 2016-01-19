@@ -70,6 +70,10 @@ func handleAdd(w http.ResponseWriter, r *http.Request, apiKey APIKey) *appError 
 	}
 
 	absResURL := fmt.Sprintf("http://%s/%s", r.Host, resURL)
+	if strChatID != "" {
+		absResURL += "?chatID=" + strChatID
+	}
+
 	resp := &AddSuccessResponse{true, absResURL}
 	respJSON, _ := json.Marshal(resp)
 	w.Write(respJSON)
@@ -210,6 +214,10 @@ func handleRemove(w http.ResponseWriter, r *http.Request, apiKey APIKey) *appErr
 
 	strChatID := r.FormValue("chatID")
 	rmPath := r.FormValue("path")
+
+	if rmPath == "" {
+		return &appError{nil, "Missing path.", 401}
+	}
 
 	var fbChatID int64 = -1
 	var chatKey *datastore.Key

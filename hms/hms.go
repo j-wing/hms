@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"net/http"
 	//"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -32,6 +33,7 @@ func init() {
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	http.HandleFunc("/add_api_key", APIKeyAddHandler)
+	http.HandleFunc("/add_chat", ChatAddHandler)
 	http.Handle("/api/", appHandler(APIHandler))
 	http.Handle("/", appHandler(ShortenerHandler))
 	//http.HandleFunc("/add", QuickAddHandler)
@@ -61,6 +63,45 @@ func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func ChatAddHandler(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	u := user.Current(c)
+	if u == nil {
+		loginUrl, _ := user.LoginURL(c, r.URL.RequestURI())
+		http.Redirect(w, r, loginUrl, http.StatusFound)
+		return
+	} else {
+		if !u.Admin {
+			w.WriteHeader(http.StatusForbidden)
+			w.Write([]byte("You're not an admin. Go away."))
+		} else {
+			name := r.FormValue("name")
+			strChatID := r.FormValue("fbID")
+
+			if name == "" || strChatID == "" {
+				w.Write([]byte("You forgot a parameter."))
+			}
+
+			fbChatID, err := strconv.ParseInt(strChatID, 10, 64)
+			if err != nil {
+				w.Write([]byte("Chat ID has to be a number."))
+			} else {
+				chat := Chat{
+					ChatName:       name,
+					FacebookChatID: fbChatID,
+				}
+				dkey := datastore.NewIncompleteKey(c, "Chat", nil)
+				_, err := datastore.Put(c, dkey, &chat)
+				if err != nil {
+					w.Write([]byte(fmt.Sprintf("error! %s", err.Error())))
+				} else {
+					w.Write([]byte("Success!"))
+
+				}
+			}
+		}
+	}
+}
 func APIKeyAddHandler(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	u := user.Current(c)
@@ -70,6 +111,7 @@ func APIKeyAddHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	} else {
 		if !u.Admin {
+			w.WriteHeader(http.StatusForbidden)
 			w.Write([]byte("You're not an admin. Go away."))
 		} else {
 			key := randomString(26)
@@ -87,7 +129,7 @@ func APIKeyAddHandler(w http.ResponseWriter, r *http.Request) {
 				if err != nil {
 					w.Write([]byte(fmt.Sprintf("error! %s", err.Error())))
 				} else {
-					w.Write([]byte(fmt.Sprintf("success! Added key: %s", key)))
+					w.Write([]byte(key))
 
 				}
 			}
