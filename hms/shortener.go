@@ -36,7 +36,7 @@ type IndexTemplateParams struct {
 
 var shortenerRoutes = map[*regexp.Regexp]routeHandler{
 	regexp.MustCompile("/([A-Z0-9-]+)[/]?$"): handleAutoShortURL,
-	regexp.MustCompile("/([a-z]+[0-9]*)$"):   handleManualShortURL,
+	regexp.MustCompile("/([a-z].*)$"):        handleManualShortURL,
 	regexp.MustCompile("/$"):                 handleChatIndex,
 }
 
@@ -62,14 +62,18 @@ func handleChatIndex(w http.ResponseWriter, r *http.Request, params []string) *a
 	c := appengine.NewContext(r)
 
 	var resultURL string
-
+	var message string
 	if r.Method == "POST" {
-		resultPath, err := createShortenedURL(r, -1)
-		if err != nil {
-			return &appError{err, err.Error(), http.StatusInternalServerError}
-		}
+		if r.FormValue("path") != "" && !IsLowercase(r.FormValue("path")[0]) {
+			message = "Custom paths must begin with a lowercase letter."
+		} else {
+			resultPath, err := createShortenedURL(r, -1)
+			if err != nil {
+				return &appError{err, err.Error(), http.StatusInternalServerError}
+			}
 
-		resultURL = fmt.Sprintf("http://%s/%s", r.Host, resultPath)
+			resultURL = fmt.Sprintf("http://%s/%s", r.Host, resultPath)
+		}
 	}
 
 	pastLinks := make([]Link, 0, 100)
@@ -78,11 +82,10 @@ func handleChatIndex(w http.ResponseWriter, r *http.Request, params []string) *a
 		return &appError{err, err.Error(), http.StatusInternalServerError}
 	}
 
-	var message string
 	path := r.FormValue("path")
 	chatID := r.FormValue("chatID")
 
-	if path != "" && r.Method == "GET" {
+	if message == "" && path != "" && r.Method == "GET" {
 		_, err = getMatchingLinkChatString(c, chatID, path)
 		if err != nil {
 			message = "/" + path + " does not exist. Create it?"

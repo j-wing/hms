@@ -7,9 +7,9 @@ from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import NoSuchElementException
 TEST_PAGE_URL = "http://bob.com/"
-TEST_PAGE_PATH = "mypath"
+TEST_PAGE_PATH = "my_path*"
 TEST_PAGE_PATH_TWO = "mypath2"
-TEST_ADD_CHAT_PATH = "mypath3"
+TEST_ADD_CHAT_PATH = "my_path3"
 
 BASE_URL = None
 API_KEY = None 
@@ -224,10 +224,32 @@ def test_api_add(driver):
 
     return True
 
+def test_path_must_begin_with_lower_letter(driver):
+    paths = ['_no', 'No']
+
+    for path in paths:
+        path_field, target = _get_form_fields(driver)
+        path_field.send_keys(path)
+        target.send_keys(TEST_PAGE_URL)
+        target.send_keys(Keys.RETURN)
+
+        try:
+            _test_header_link_goes_to(driver, TEST_PAGE_URL)
+        except NoSuchElementException:
+            pass
+        except AssertionError:
+            print "Was able to create: ", path
+            return False
+        else:
+            print "Neither NoSuchElem or AssertionError. Test needs updating"
+            return False
+    return True
+
 TESTS = [
         #test_unauthorized_email_fails,
         test_cant_add_api_key_if_not_logged_in,
         test_access_requires_login,
+        test_path_must_begin_with_lower_letter,
         test_can_create_explicit_path,
         test_can_create_random_path,
         test_multiple_links_with_same_path_fail,

@@ -15,6 +15,9 @@ import (
 
 const ALPHABET = "BV-XDyI4JLQ06KYH8G3OZ1FE7U9C25RSMNWTPA"
 
+func IsLowercase(a byte) bool {
+	return 97 <= a && a <= 122
+}
 func ShortURLEncode(n int64) string {
 	base := int64(len(ALPHABET))
 	num_digits := int64(1 + math.Floor((math.Log(float64(n)) / math.Log(float64(base)))))
