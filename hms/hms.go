@@ -34,6 +34,7 @@ func init() {
 
 	http.HandleFunc("/add_api_key", APIKeyAddHandler)
 	http.HandleFunc("/add_chat", ChatAddHandler)
+	http.HandleFunc("/backup", BackupLinksHandler)
 	http.Handle("/api/", appHandler(APIHandler))
 	http.Handle("/", appHandler(ShortenerHandler))
 	//http.HandleFunc("/add", QuickAddHandler)
@@ -63,6 +64,45 @@ func (fn appHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func BackupLinksHandler(w http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+	u := user.Current(c)
+	if u == nil {
+		loginUrl, _ := user.LoginURL(c, r.URL.RequestURI())
+		http.Redirect(w, r, loginUrl, http.StatusFound)
+		return
+	} else {
+		if !u.Admin {
+			w.WriteHeader(http.StatusForbidden)
+			w.Write([]byte("You're not an admin. Go away."))
+		} else {
+			w.Header().Set("Content-Type", "text/plain")
+			results := datastore.NewQuery("Link").Order("-Created").Run(c)
+			DELIM := "|||"
+			var link Link
+			for {
+				_, err := results.Next(&link)
+				if err == datastore.Done {
+					break
+				} else if err != nil {
+					w.Write([]byte(err.Error()))
+				} else {
+					var chat Chat
+					s := link.Path + DELIM + link.TargetURL + DELIM + link.Creator + DELIM
+					s += strconv.FormatInt(link.Created.Unix(), 10) + DELIM
+					if link.ChatKey != nil {
+						err = datastore.Get(c, link.ChatKey, &chat)
+						if err != nil {
+							continue
+						}
+						s += strconv.FormatInt(chat.FacebookChatID, 10) + DELIM + chat.ChatName
+					}
+					w.Write([]byte(s + "\n"))
+				}
+			}
+		}
+	}
+}
 func ChatAddHandler(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 	u := user.Current(c)
