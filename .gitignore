@@ -1,2 +1,3 @@
 *.swp
 hms/secrets.go
+index.yaml
