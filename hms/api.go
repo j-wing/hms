@@ -12,7 +12,7 @@ import (
 	"google.golang.org/appengine/datastore"
 )
 
-const API_MAX_LIMIT = 50
+const API_MAX_LIMIT = 100
 
 type AddSuccessResponse struct {
 	Success   bool
@@ -309,5 +309,6 @@ func APIHandler(w http.ResponseWriter, r *http.Request) *appError {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	return handler(w, r, apiKeyStruct)
 }
