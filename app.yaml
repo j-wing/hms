@@ -1,5 +1,5 @@
 application: hms-1123
-version: 2
+version: 3
 runtime: go
 api_version: go1
 
