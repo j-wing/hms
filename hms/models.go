@@ -56,6 +56,15 @@ type Link struct {
 	Creator   string
 	Created   time.Time
 	ChatKey   *datastore.Key `json:"-"`
+	MusicInfo *MusicInfo
+}
+
+type MusicInfo struct {
+	Artist     string      `json:"artist"`
+	Genres     []string    `json:"genres"`
+	SubGenres  []string    `json:"subgenres"`
+	SourceType MusicSource `json:"sourceType,string"`
+	Title      string      `json: "title"`
 }
 
 // Used by templates to format the Link struct's created field.
