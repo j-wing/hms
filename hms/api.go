@@ -12,7 +12,7 @@ import (
 	"google.golang.org/appengine/datastore"
 )
 
-const API_MAX_LIMIT = 100
+const API_BATCH_AMT = 100
 
 type AddSuccessResponse struct {
 	Success   bool
@@ -137,7 +137,7 @@ func handleList(w http.ResponseWriter, r *http.Request, apiKey APIKey) *appError
 		n, err1 = strconv.ParseInt(sLimit, 10, 32)
 		limit = int(n)
 	} else {
-		limit = API_MAX_LIMIT
+		limit = API_BATCH_AMT
 	}
 
 	if sOffset != "" {
@@ -156,8 +156,8 @@ func handleList(w http.ResponseWriter, r *http.Request, apiKey APIKey) *appError
 		return &appError{err, "Bad limit or offset: " + err.Error(), 400}
 	}
 
-	if limit > API_MAX_LIMIT {
-		limit = API_MAX_LIMIT
+	if limit > API_BATCH_AMT {
+		limit = API_BATCH_AMT
 	}
 	if offset > limit {
 		offset = 0
@@ -183,11 +183,11 @@ func handleList(w http.ResponseWriter, r *http.Request, apiKey APIKey) *appError
 		chatKey = nil
 	}
 
-	results := make([]Link, 0, limit)
-	_, err = datastore.NewQuery("Link").
+	results := make([]Link, 0)
+	q := datastore.NewQuery("Link").
 		Filter("ChatKey =", chatKey).
-		Order("-Created").
-		Limit(limit).Offset(offset).GetAll(c, &results)
+		Order("-Created").Offset(offset).Limit(limit)
+	_, err = q.GetAll(c, &results)
 
 	if err != nil {
 		return &appError{err, "Datastore error: " + err.Error(), 500}
