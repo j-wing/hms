@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
-	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -165,15 +164,19 @@ func createShortenedURL(r *http.Request, chatID int64) (string, error) {
 			return "", errors.New("invalid path")
 		}
 
-		parsedUrl, err := url.Parse(target)
+		u := Link{
+			Path:      path,
+			TargetURL: target,
+			Created:   time.Now(),
+		}
+
+		parsedUrl, err := u.parseTarget()
+
 		if err != nil {
 			return "", err
-		} else if parsedUrl.Scheme == "" {
-			parsedUrl, err = url.Parse("http://" + target)
-			if err != nil {
-				return "", err
-			}
 		}
+
+		u.TargetURL = parsedUrl.String()
 
 		if parsedUrl.Host == r.Host {
 			return "", errors.New("Don't try to make redirect loops.")
@@ -199,9 +202,12 @@ func createShortenedURL(r *http.Request, chatID int64) (string, error) {
 			creator = currUser.Email
 		}
 
+		u.Creator = creator
+
 		var chatKey *datastore.Key
+		var chat Chat
 		if chatID >= 0 {
-			_, err = getOrCreateChat(c, chatID, &chatKey)
+			chat, err := getOrCreateChat(c, chatID, &chatKey)
 			if err != nil {
 				return "", err
 			}
@@ -209,12 +215,11 @@ func createShortenedURL(r *http.Request, chatID int64) (string, error) {
 			chatKey = nil
 		}
 
-		u := Link{
-			Path:      path,
-			TargetURL: parsedUrl.String(),
-			Creator:   creator,
-			Created:   time.Now(),
-			ChatKey:   chatKey,
+		u.ChatKey = chatKey
+
+		if chat.IsMusicEnabled && u.IsLikelyMusicLink() {
+			var info MusicInfo
+
 		}
 
 		finalPath := path

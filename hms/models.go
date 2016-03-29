@@ -2,6 +2,7 @@ package hms
 
 import (
 	"errors"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 type Chat struct {
 	ChatName       string
 	FacebookChatID int64
+	IsMusicEnabled bool
 }
 
 func getOrCreateChat(c context.Context, fbChatID int64, keyBuf **datastore.Key) (*Chat, error) {
@@ -32,6 +34,7 @@ func getOrCreateChat(c context.Context, fbChatID int64, keyBuf **datastore.Key) 
 		resultChat = &Chat{
 			FacebookChatID: fbChatID,
 			ChatName:       "",
+			IsMusicEnabled: false,
 		}
 		resultKey, err = datastore.Put(c, incKey, resultChat)
 		if err != nil {
@@ -70,6 +73,23 @@ type MusicInfo struct {
 // Used by templates to format the Link struct's created field.
 func (l *Link) FormatCreated() string {
 	return l.Created.Add(time.Hour * -8).Format("3:04pm, Monday, January 2")
+}
+
+func (l *Link) parseTarget() (*url.URL, error) {
+	parsedUrl, err := url.Parse(l.TargetURL)
+	if err != nil {
+		return nil, err
+	} else if parsedUrl.Scheme == "" {
+		parsedUrl, err = url.Parse("http://" + l.TargetURL)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return parsedUrl, nil
+}
+
+func (l Link) IsLikelyMusicLink() bool {
+	return false
 }
 
 func getMatchingLink(c context.Context, fbChatID int64, path string) (*Link, error) {
