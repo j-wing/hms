@@ -2,7 +2,9 @@ package hms
 
 import (
 	"errors"
+	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"golang.org/x/net/context"
@@ -56,11 +58,50 @@ type Link struct {
 	Creator   string
 	Created   time.Time
 	ChatKey   *datastore.Key `json:"-"`
+	MusicInfo MusicInfo
+}
+
+type MusicInfo struct {
+	Artists    []string    `json:"artists"`
+	Genres     []string    `json:"genres"`
+	SubGenres  []string    `json:"subgenres"`
+	SourceType MusicSource `json:"sourceType"`
+	Title      string      `json:"title"`
 }
 
 // Used by templates to format the Link struct's created field.
 func (l *Link) FormatCreated() string {
 	return l.Created.Add(time.Hour * -8).Format("3:04pm, Monday, January 2")
+}
+
+func (l *Link) parseTarget() (*url.URL, error) {
+	parsedUrl, err := url.Parse(l.TargetURL)
+	if err != nil {
+		return nil, err
+	} else if parsedUrl.Scheme == "" {
+		parsedUrl, err = url.Parse("http://" + l.TargetURL)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return parsedUrl, nil
+}
+
+func (l Link) IsLikelyMusicLink() bool {
+	url, err := l.parseTarget()
+	if err != nil {
+		// this should never happen, but this is the simplest way to handle it.
+		return false
+	}
+
+	if strings.Contains(url.Host, "spotify.com") ||
+		strings.Contains(url.Host, "youtube.") ||
+		strings.Contains(url.Host, "youtu.be") ||
+		strings.Contains(url.Host, "songl.ink") {
+
+		return true
+	}
+	return false
 }
 
 func getMatchingLink(c context.Context, fbChatID int64, path string) (*Link, error) {

@@ -57,9 +57,14 @@ func handleAdd(w http.ResponseWriter, r *http.Request, apiKey APIKey) *appError 
 
 	strChatID := r.FormValue("chatID")
 
-	fbChatID, err := strconv.ParseInt(strChatID, 10, 64)
-	if strChatID != "" && err != nil {
-		return &appError{err, "Invalid chat ID: " + err.Error(), 400}
+	if strChatID != "" {
+		var err error
+		fbChatID, err = strconv.ParseInt(strChatID, 10, 64)
+		if err != nil {
+			return &appError{err, "Invalid chat ID: " + err.Error(), 400}
+		}
+	} else {
+		fbChatID = -1
 	}
 
 	resURL, err := createShortenedURL(r, fbChatID)
