@@ -1,9 +1,5 @@
 package hms
 
-import (
-	"encoding/json"
-)
-
 type MusicSource int
 
 const (
@@ -14,14 +10,14 @@ const (
 )
 
 var sourceStringMap = map[MusicSource]string{
-	SOURCE_UNKNOWN:  "unknown",
+	SOURCE_UNKNOWN:  "other",
 	SOURCE_SPOTIFY:  "spotify",
 	SOURCE_SONGLINK: "songlink",
 	SOURCE_YOUTUBE:  "youtube",
 }
 
 var sourceIntMap = map[string]MusicSource{
-	"unknown":  SOURCE_UNKNOWN,
+	"other":    SOURCE_UNKNOWN,
 	"spotify":  SOURCE_SPOTIFY,
 	"songlink": SOURCE_SONGLINK,
 	"youtube":  SOURCE_YOUTUBE,
@@ -29,8 +25,4 @@ var sourceIntMap = map[string]MusicSource{
 
 func (s MusicSource) String() string {
 	return sourceStringMap[s]
-}
-
-func (s MusicSource) MarshalJSON() ([]byte, error) {
-	return json.Marshal(s.String())
 }
