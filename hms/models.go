@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"golang.org/x/net/context"
@@ -15,7 +16,6 @@ import (
 type Chat struct {
 	ChatName       string
 	FacebookChatID int64
-	IsMusicEnabled bool
 }
 
 func getOrCreateChat(c context.Context, fbChatID int64, keyBuf **datastore.Key) (*Chat, error) {
@@ -34,7 +34,6 @@ func getOrCreateChat(c context.Context, fbChatID int64, keyBuf **datastore.Key) 
 		resultChat = &Chat{
 			FacebookChatID: fbChatID,
 			ChatName:       "",
-			IsMusicEnabled: false,
 		}
 		resultKey, err = datastore.Put(c, incKey, resultChat)
 		if err != nil {
@@ -63,7 +62,7 @@ type Link struct {
 }
 
 type MusicInfo struct {
-	Artist     string      `json:"artist"`
+	Artists    []string    `json:"artists"`
 	Genres     []string    `json:"genres"`
 	SubGenres  []string    `json:"subgenres"`
 	SourceType MusicSource `json:"sourceType"`
@@ -89,6 +88,19 @@ func (l *Link) parseTarget() (*url.URL, error) {
 }
 
 func (l Link) IsLikelyMusicLink() bool {
+	url, err := l.parseTarget()
+	if err != nil {
+		// this should never happen, but this is the simplest way to handle it.
+		return false
+	}
+
+	if strings.Contains(url.Host, "spotify.com") ||
+		strings.Contains(url.Host, "youtube.") ||
+		strings.Contains(url.Host, "youtu.be") ||
+		strings.Contains(url.Host, "songl.ink") {
+
+		return true
+	}
 	return false
 }
 
