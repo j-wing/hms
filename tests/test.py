@@ -7,6 +7,7 @@ from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import NoSuchElementException
 TEST_PAGE_URL = "http://bob.com/"
+TEST_MUSIC_URL = "http://www.songl.ink/9b3b3"
 TEST_PAGE_PATH = "my_path*"
 TEST_PAGE_PATH_TWO = "mypath2"
 TEST_ADD_CHAT_PATH = "my_path3"
@@ -20,6 +21,21 @@ API_LIST = ("GET", "/api/list")
 API_RESOLVE = ("GET", "/api/resolve")
 
 STATUSES_SUCCESS = (200,)
+
+CORRECT_MUSIC_DATA = {
+                    "artists": ["Rick Astley"],
+                    "title": "Never Gonna Give You Up",
+                    "sourceType": 2,
+                    "genres": [u"rock", u"pop"],
+                    "subgenres": [
+                        u"soft rock",
+                        u"europop",
+                        u"new wave pop",
+                        u"hi nrg",
+                        u"synthpop",
+                        u"new romantic"
+                    ]}
+
 
 def _get_form_fields(driver):
     path_field = driver.find_element_by_name("path")
@@ -132,6 +148,7 @@ def test_can_add_api_key(driver):
     driver.get("%s/add_api_key?owner=test@example.com" % BASE_URL)
     assert "error" not in driver.page_source
     API_KEY = driver.page_source
+    print "Using API key: ", API_KEY
     return True
 
 def test_no_apikey_fails(driver):
@@ -196,6 +213,39 @@ def test_api_remove(driver):
 
     return True
 
+def _is_matching_music_data(test_data, correct):
+    for key in correct:
+        match = test_data[key]
+        if type(match) is list and set(match) != set(correct[key]):
+            print "Mismatched value for key: ", key, match, correct[key]
+            return False
+        elif match != correct[key]:
+            print "Mismatched value for key: ", key, match, correct[key]
+            return False
+    return True
+
+def test_api_add_with_music(driver):
+    result = _assert_api_success_status(API_ADD, {
+        'target': TEST_MUSIC_URL,
+        "creator": "Test Tester"
+    })
+
+    assert result['Success']
+
+    time.sleep(.5)
+    driver.get(result['ResultURL'])
+    assert driver.current_url == TEST_MUSIC_URL,driver.current_url 
+
+    result = _assert_api_success_status(API_LIST, {})
+    
+    found = False
+    for item in result['Links']:
+        if _is_matching_music_data(item['MusicInfo'], CORRECT_MUSIC_DATA):
+            found = True
+            break
+    assert found, "Incorrect or missing music data: {}".format(result)
+
+    return True
 def test_api_add(driver):
     _assert_api_failure_status(API_ADD, {})
     
@@ -258,6 +308,7 @@ TESTS = [
         test_api_add,
         test_api_resolve,
         test_api_remove,
+        test_api_add_with_music,
     ]
 
 def main(url, tests):
