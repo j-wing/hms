@@ -1,10 +1,13 @@
 package hms
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
+	"io/ioutil"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -15,6 +18,7 @@ import (
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/datastore"
 	"google.golang.org/appengine/log"
+	"google.golang.org/appengine/urlfetch"
 	"google.golang.org/appengine/user"
 )
 
@@ -34,9 +38,9 @@ type IndexTemplateParams struct {
 }
 
 var shortenerRoutes = map[*regexp.Regexp]routeHandler{
-	regexp.MustCompile("/([A-Z0-9-]+)[/]?$"): handleAutoShortURL,
-	regexp.MustCompile("/([a-z].*)$"):        handleManualShortURL,
-	regexp.MustCompile("/$"):                 handleChatIndex,
+	regexp.MustCompile("/([yA-Z0-9-]+)[/]?$"): handleAutoShortURL,
+	regexp.MustCompile("/([a-z].*)$"):         handleManualShortURL,
+	regexp.MustCompile("/$"):                  handleChatIndex,
 }
 
 // Base handler for all requests handled by the URL shortenening/archiving code.
@@ -205,9 +209,8 @@ func createShortenedURL(r *http.Request, chatID int64) (string, error) {
 		u.Creator = creator
 
 		var chatKey *datastore.Key
-		var chat Chat
 		if chatID >= 0 {
-			chat, err := getOrCreateChat(c, chatID, &chatKey)
+			_, err = getOrCreateChat(c, chatID, &chatKey)
 			if err != nil {
 				return "", err
 			}
@@ -217,9 +220,30 @@ func createShortenedURL(r *http.Request, chatID int64) (string, error) {
 
 		u.ChatKey = chatKey
 
-		if chat.IsMusicEnabled && u.IsLikelyMusicLink() {
+		if u.IsLikelyMusicLink() {
 			var info MusicInfo
+			client := urlfetch.Client(c)
+			params := url.Values{}
+			params.Set("link", u.TargetURL)
 
+			// TODO implement a task queue operation to fill in the info if this request fails.
+			resp, err := client.Get("http://music.hms.space/get_music_info?" + params.Encode())
+			if err != nil {
+				log.Errorf(c, "Request for music info for %v failed. Error: %v", u.TargetURL, err.Error())
+			} else {
+				defer resp.Body.Close()
+				body, err := ioutil.ReadAll(resp.Body)
+				if err != nil {
+					log.Errorf(c, "Failed to read body: %v", err.Error())
+				} else {
+					err = json.Unmarshal(body, &info)
+					if err != nil {
+						log.Errorf(c, "Failed to parse music response json: %v; json was %v", err.Error(), body)
+					} else {
+						u.MusicInfo = info
+					}
+				}
+			}
 		}
 
 		finalPath := path
@@ -241,6 +265,7 @@ func createShortenedURL(r *http.Request, chatID int64) (string, error) {
 					Creator:   u.Creator,
 					Created:   u.Created,
 					ChatKey:   u.ChatKey,
+					MusicInfo: u.MusicInfo,
 				}
 				_, err2 := datastore.Put(c, newKey, &linkCopy)
 				if err2 != nil {
