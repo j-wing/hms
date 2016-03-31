@@ -72,7 +72,7 @@ func handleUserAuth(w http.ResponseWriter, r *http.Request) (*user.User, bool) {
 	c := appengine.NewContext(r)
 	u := user.Current(c)
 	if u == nil {
-		loginUrl, _ := user.LoginURL(c, "/")
+		loginUrl, _ := user.LoginURL(c, r.URL.Path)
 		http.Redirect(w, r, loginUrl, http.StatusFound)
 		return nil, true
 	} else if !isAuthorizedUser(*u) {
