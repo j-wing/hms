@@ -164,9 +164,6 @@ func handleList(w http.ResponseWriter, r *http.Request, apiKey APIKey) *appError
 	if limit > API_BATCH_AMT {
 		limit = API_BATCH_AMT
 	}
-	if offset > limit {
-		offset = 0
-	}
 
 	c := appengine.NewContext(r)
 	var chat *Chat
